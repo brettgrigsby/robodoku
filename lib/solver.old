@@ -1,0 +1,194 @@
+class Solver
+  attr_reader :rows, :columns, :squares, :spots
+
+  def initialize(puzzle_string)
+    @spots = (puzzle_string.chars - ["\n"]).map { |char| Spot.new(char) }
+    @rows = []
+    @columns = []
+    @squares = []
+    @sections = []
+  end
+
+  def make_board
+    rows_array = @spots.each_slice(9).to_a
+    @rows = rows_array.map { |spots| Row.new(spots) }
+    columns_array = rows_array.transpose
+    @columns = columns_array.map { |spots| Column.new(spots) }
+    squares_array = rows_array.each_slice(3).flat_map do |arrays|
+      arrays.transpose.flatten
+    end.each_slice(9).to_a
+    @squares = squares_array.map { |spots| Square.new(spots) }
+    @sections = @rows + @columns + @squares
+  end
+
+  def assign_peers
+    @rows.each(&:assign_peers)
+    @columns.each(&:assign_peers)
+    @squares.each(&:assign_peers)
+    @spots.each(&:set_candidates)
+  end
+
+  def unsolved_spots
+    spots.select(&:unsolved?)
+  end
+
+  def no_easy?
+    @spots.map { |spot| spot.candidates.size}.include?(1)
+  end
+
+  def incorrect?
+    @spots.map(&:incorrect?).include?(true)
+  end
+
+  def low_hanging_fruit
+    unsolved_spots.each(&:simple_solve)
+  end
+
+  def answer
+    @rows.map(&:output).join("\n")
+  end
+
+  def solve
+    iterations = 0
+    make_board
+    until solved?
+      assign_peers
+      # assign_peers
+      low_hanging_fruit
+      # hidden_singles
+      raise RuntimeError, 'you dumb, boy' if iterations == 30
+      iterations +=1
+    end
+    answer
+  end
+
+  def hidden_singles
+    @sections.each(&:hidden_singles)
+  end
+
+  def solved?
+    @spots.none?(&:unsolved?)
+  end
+
+end
+
+class Spot
+  attr_accessor :value, :peers, :candidates
+
+  def initialize(value)
+    @value = value
+    @peers = []
+    @candidates = []
+  end
+
+  def inspect
+    "Spot - Value:#{@value}, Peers:#{@peers.size}, Candidates:#{@candidates.join(',')}"
+  end
+
+  def unsolved?
+    value == ' '
+  end
+
+  def possibles
+    ['1','2','3','4','5','6','7','8','9'] - peers.map(&:value).uniq
+  end
+
+  def set_candidates
+    @candidates = possibles
+  end
+
+
+  def simple_solve
+    @candidates.size == 1 ? @value = possibles[0] : nil
+  end
+
+  def incorrect?
+    possibles == []
+  end
+
+end
+
+class Section
+  attr_reader :spots
+
+  def initialize(spots)
+    @spots = spots
+  end
+
+  def assign_peers
+    @spots.each do |spot|
+      spot.peers += (@spots - [spot])
+    end
+    # values = spots.map(&:value)
+    # spots.each { |spot| spot.peers += (values - [spot.value]) }
+  end
+
+  def unsolved_spots
+    spots.select(&:unsolved?)
+  end
+
+  def unsolved_values
+    unsolved_spots.map(&:value)
+  end
+
+  def hidden_singles
+    spots.each do |spot|
+      candidates = spot.candidates - other_possibles(spot)
+      spot.value = candidates[0] if candidates.size == 1
+    end
+  end
+
+  def other_possibles(spot)
+    (unsolved_spots - [spot]).map(&:candidates).flatten.uniq
+  end
+
+  def naked_pair?
+    unsolved_spots.size == 2
+  end
+
+end
+
+class Row < Section
+  def output
+    spots.map(&:value).join
+  end
+end
+
+class Column < Section
+end
+
+class Square < Section
+end
+
+# def solver_dog
+#   iterations = 0
+#   make_board
+#   until solved?
+#     assign_peers
+#     low_hanging_fruit
+#     naked_pair_solve
+#     raise RuntimeError, 'you dumb, boy' if iterations == 100
+#     iterations +=1
+#   end
+#   answer
+# end
+
+# def naked_pair_solve
+#   iterations =0
+#   @sections.each do |section|
+#     spots_copy = @spots.dup
+#     if section.naked_pair?
+#       section.unsolved_spots[0].value = section.unsolved_values[0]
+#       until incorrect? || iterations == 10
+#       assign_peers
+#       low_hanging_fruit
+#       end
+#       if incorrect?
+#         @spots = spots_copy
+#         make_board
+#         section.unsolved_spots[0].value = section.unsolved_values[1]
+#
+#       end
+#     end
+#   end
+# end

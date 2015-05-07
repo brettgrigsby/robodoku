@@ -1,80 +1,85 @@
-class Solver
-  attr_reader :spots, :size, :rows, :columns, :squares
+require_relative 'section'
+require_relative 'spot'
 
-  def initialize(puzzle_text)
-    @size = puzzle_text.index("\n")
-    @spots = (puzzle_text.chars - ["\n"]).map { |num| Spot.new(num) }
-    @chunk = Math.sqrt(size).to_i
+
+class Solver
+  attr_reader :rows, :columns, :squares, :spots
+
+  def initialize(puzzle_string)
+    @spots = (puzzle_string.chars - ["\n"]).map { |char| Spot.new(char) }
     @rows = []
     @columns = []
     @squares = []
+    @sections = []
   end
 
-  def make_rows
-    spots.each_slice(size) { |slice| rows << Row.new(slice)}
-  end
-
-  def make_columns
-    index = 0
-    size.times do |i|
-      column_spots = []
-      until column_spots.size == size
-        column_spots << spots[index]
-        index += size
-      end
-      columns << Column.new(column_spots)
-      index = i
-    end
-  end
-
-  def make_squares
-    front = 0
-    back = @chunk - 1
-    row_index = 0
-    square_spots = []
-    size.times do |i|
-      until square_spots.size == size
-        raise ArgumentError, "#{i}, #{squares.size}" if row_index == 9
-        square_spots = square_spots + rows[row_index].spots[front..back]
-        row_index += 1
-      end
-      squares << Square.new(square_spots)
-      square_spots = []
-      if row_index == size - 1
-        front += @chunk
-        back += @chunk
-        row_index = 0
+  def solve
+    make_board
+    set_peers
+    iterations = 0
+    until solved?
+      low_hanging_fruit
+      find_hidden_singles
+      find_naked_pairs
+      find_hidden_pairs
+      iterations += 1
+      if iterations == 30
+        raise RuntimeError, 'Sorry, bro'
       end
     end
+    answer
   end
 
-  def first_three
-    @chunk.times
-
+  def make_board
+    rows_array = @spots.each_slice(9).to_a
+    @rows = rows_array.map { |spots| Row.new(spots) }
+    columns_array = rows_array.transpose
+    @columns = columns_array.map { |spots| Column.new(spots) }
+    squares_array = rows_array.each_slice(3).flat_map do |arrays|
+      arrays.transpose.flatten
+    end.each_slice(9).to_a
+    @squares = squares_array.map { |spots| Square.new(spots) }
+    @sections = @rows + @columns + @squares
   end
 
-end
-
-class Spot
-  attr_reader :value, :peers
-  def initialize(value)
-    @value = value
-    @peers = []
+  def find_hidden_singles
+    remove_peer_candidates
+    @sections.each(&:find_hidden_single)
   end
-end
 
-class Section
-  attr_reader :spots
-  def initialize(spots)
-    @spots = spots
+  def find_naked_pairs
+    remove_peer_candidates
+    @sections.each(&:find_naked_pair)
   end
-end
 
-class Row < Section
-end
+  def find_hidden_pairs
+    remove_peer_candidates
+    @sections.each(&:find_hidden_pair)
+  end
 
-class Column < Section
-end
+  def set_peers
+    @sections.each(&:set_peers)
+  end
 
-class Square < Section
+  def unsolved_spots
+    @spots.select(&:unsolved?)
+  end
+
+  def remove_peer_candidates
+    @spots.each(&:remove_peer_candidates)
+  end
+
+  def low_hanging_fruit
+    remove_peer_candidates
+    unsolved_spots.each(&:simple_solve)
+  end
+
+  def solved?
+    @spots.none?(&:unsolved?)
+  end
+
+  def answer
+    @rows.map(&:output).join("\n")
+  end
+
 end

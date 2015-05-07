@@ -1,9 +1,9 @@
 require "minitest"
 require "minitest/autorun"
 require './lib/solver'
-require './lib/spot'
 
 class SolverTest < Minitest::Test
+
   def test_it_can_make_a_row
     puzzle_text = File.read('./puzzles/easy_sample.txt')
     solver = Solver.new(puzzle_text)
@@ -83,9 +83,10 @@ class SolverTest < Minitest::Test
     puzzle_text = File.read('./puzzles/easy_sample.txt')
     solver = Solver.new(puzzle_text)
     solver.make_board
-    solver.set_peers
+    solver.assign_peers
     assert_equal 24, solver.spots[0].peers.size
-    assert_equal Spot, solver.spots[0].peers[0].class
+    assert_equal "Spot - Value: , Peers:24, Candidates:8" , solver.spots[0].inspect
+
   end
 
   def test_spots_can_tell_if_they_have_been_determined
@@ -95,19 +96,19 @@ class SolverTest < Minitest::Test
     refute solver.spots[1].unsolved?
   end
 
-  def test_spots_can_find_candidates
+  def test_spots_can_find_possible_values
     puzzle_text = File.read('./puzzles/easy_sample.txt')
     solver = Solver.new(puzzle_text)
     solver.make_board
-    solver.set_peers
-    solver.spots.each(&:remove_peer_candidates)
-    assert_equal ['8'], solver.spots[0].candidates
+    solver.assign_peers
+    assert_equal ['8'], solver.spots[0].possibles
   end
 
   def test_returns_unsolved_spots
     puzzle_text = File.read('./puzzles/easy_sample.txt')
     solver = Solver.new(puzzle_text)
     solver.make_board
+    solver.assign_peers
     assert_equal 1, solver.unsolved_spots.size
     assert_equal Spot, solver.unsolved_spots[0].class
   end
@@ -116,7 +117,7 @@ class SolverTest < Minitest::Test
     puzzle_text = File.read('./puzzles/easy_sample.txt')
     solver = Solver.new(puzzle_text)
     solver.make_board
-    solver.set_peers
+    solver.assign_peers
     solver.low_hanging_fruit
     assert_equal "8", solver.spots[0].value
   end
@@ -133,51 +134,30 @@ class SolverTest < Minitest::Test
     assert_equal "826594317\n715638942\n394721865\n163459278\n948267153\n257813694\n531942786\n482176539\n679385421", solver.solve
   end
 
+  def test_solves_less_easy_puzzles
+    skip
+    puzzle_text = File.read('./puzzles/less_easy.txt')
+    solver = Solver.new(puzzle_text)
+    assert_equal 'the answer', solver.solver_dog
+  end
+
   def test_sections_can_tell_a_spot_its_peers_possibilities
     puzzle_text = File.read('./puzzles/hidden_single.txt')
     solver = Solver.new(puzzle_text)
     solver.make_board
-    solver.set_peers
-    solver.remove_peer_candidates
+    solver.assign_peers
     row = solver.rows[2]
-    assert_equal ['3','4','7','9'], row.sibling_candidates(row.spots[3])
+    assert_equal ['3','4','7','9'], row.other_possibles(row.spots[3])
   end
 
   def test_finds_hidden_singles
     puzzle_text = File.read('./puzzles/hidden_single.txt')
     solver = Solver.new(puzzle_text)
     solver.make_board
-    solver.set_peers
-    solver.remove_peer_candidates
-    solver.low_hanging_fruit
-    solver.find_hidden_singles
+    solver.assign_peers
     row = solver.rows[2]
+    row.hidden_singles
     assert_equal '6', row.spots[3].value
-  end
-
-  def test_finds_naked_pairs
-    puzzle_text = File.read('./puzzles/naked_pair.txt')
-    solver = Solver.new(puzzle_text)
-    solver.make_board
-    solver.set_peers
-    solver.remove_peer_candidates
-    square = solver.squares[4]
-    square.find_naked_pair
-    solver.low_hanging_fruit
-    assert_equal '5', square.spots[0].value
-  end
-
-  def test_finds_hidden_pairs
-    puzzle_text = File.read('./puzzles/hidden_pair.txt')
-    solver = Solver.new(puzzle_text)
-    solver.make_board
-    solver.set_peers
-    solver.remove_peer_candidates
-    square = solver.squares[0]
-    square.find_hidden_pair
-
-    assert_equal ['4','7'], square.spots[0].candidates
-    assert_equal ['4','7'], square.spots[3].candidates
   end
 
 end
